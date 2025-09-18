@@ -207,6 +207,7 @@ body{
   background:var(--panel-2); border:1px solid var(--border)
 }
 .avatar img{width:100%;height:100%;object-fit:cover}
+.avatar i{ font-size:18px; color: var(--icon); }
 
 .msg .content{white-space:pre-wrap}
 .msg .content code{
@@ -266,6 +267,59 @@ textarea.input:focus{border-color: color-mix(in srgb, var(--accent), var(--borde
   transform: translateY(8px); animation: lift-in var(--duration) var(--ease)
 }
 
+/* Avatar preview */
+.avatar-preview{
+  width:56px; height:56px; border-radius:50%;
+  object-fit:cover; border:1px solid var(--border); background:var(--panel-2);
+}
+.avatar-preview.box{
+  width:56px; height:56px; border-radius:50%;
+  display:grid; place-items:center;
+  border:1px solid var(--border); background:var(--panel-2);
+  overflow:hidden;
+}
+.avatar-preview.box i{ font-size:20px; color:var(--icon); }
+.avatar-preview.box img{
+  display:none; width:100%; height:100%; object-fit:cover;
+}
+.avatar-preview.box.has-img i{ display:none; }
+.avatar-preview.box.has-img img{ display:block; }
+
+/* Segmented control for models */
+.seg{
+  display:flex; gap:8px; background:var(--panel-2); border:1px solid var(--border);
+  padding:6px; border-radius:12px; flex-wrap:wrap;
+}
+.seg .opt{
+  flex:1 1 220px; min-width:200px;
+  display:flex; flex-direction:column; align-items:flex-start;
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  padding:10px 12px; cursor:pointer; transition: transform var(--duration-fast) var(--ease),
+  border-color var(--duration) var(--ease), background var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+}
+.seg .opt .title{ font-weight:700; }
+.seg .opt .sub{ color:var(--muted); font-size:12px; }
+.seg .opt:hover{ transform:translateY(-1px); box-shadow:var(--shadow-1); }
+.seg .opt.active{ border-color: color-mix(in srgb, var(--accent), var(--border) 55%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent), transparent 75%), var(--shadow-1); }
+
+/* Tiny avatar in "You" pill */
+.you-ava{ width:16px; height:16px; border-radius:50%; object-fit:cover;
+  margin-right:6px; border:1px solid var(--border); vertical-align:-2px; }
+
+/* Tooltip for delete button */
+.has-tip{ position:relative; }
+.has-tip::after{
+  content: attr(data-tip);
+  position:absolute; bottom:calc(100% + 8px); right:0;
+  background:var(--panel); color:var(--text); border:1px solid var(--border);
+  font-size:12px; padding:6px 8px; border-radius:8px; box-shadow:var(--shadow-2);
+  opacity:0; pointer-events:none; transform:translateY(6px) scale(.98);
+  transition: opacity var(--duration) var(--ease), transform var(--duration) var(--ease);
+  white-space:nowrap; z-index:5;
+}
+.has-tip:hover::after{ opacity:1; transform:none; }
+
 /* ====== RESPONSIVE ====== */
 @media (max-width: 980px){
   .app{grid-template-columns:0 1fr}
@@ -279,6 +333,9 @@ textarea.input:focus{border-color: color-mix(in srgb, var(--accent), var(--borde
 .msg .content table{ width:100%; border-collapse: collapse; margin: 8px 0; font-size: 0.95em; }
 .msg .content th, .msg .content td{ border:1px solid var(--border); padding:6px 8px; }
 .msg .content th{ background: color-mix(in srgb, var(--panel-2), #fff 3%); }
+.msg .body{ display:flex; flex-direction:column; gap:6px; }
+.msg .meta{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+.msg .meta .name{ font-weight:700; color:var(--text); }
 </style>
 </head>
 <body class="theme-dark">
@@ -412,7 +469,7 @@ textarea.input:focus{border-color: color-mix(in srgb, var(--accent), var(--borde
     <div class="topbar">
       <div style="display:flex; align-items:center; gap:10px">
         <div class="model">
-          <div class="pill" id="model-pill">GPT-like</div>
+          <div class="pill" id="model-pill">UnAI Model</div>
           <div class="pill hide-on-mobile" id="status-pill">Ready</div>
         </div>
       </div>
@@ -450,12 +507,35 @@ textarea.input:focus{border-color: color-mix(in srgb, var(--accent), var(--borde
       <div class="field"><label>Display name <i class="fa-solid fa-signature"></i></label><input id="profile-name"/></div>
       <div class="field"><label>Email <i class="fa-solid fa-envelope"></i></label><input id="profile-email" readonly/></div>
     </div>
+    <!-- Avatar -->
+    <div class="field" style="margin:8px 0">
+      <label>Avatar</label>
+      <div style="display:flex; align-items:center; gap:12px">
+        <div id="profile-avatar-preview" class="avatar-preview box">
+          <i class="fa-solid fa-user" aria-hidden="true"></i>
+          <img id="profile-avatar-img" alt="Avatar">
+        </div>
+        <input id="profile-avatar" type="file" accept="image/*" hidden>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn secondary" id="avatar-upload">Upload</button>
+          <button class="btn ghost" id="avatar-remove">Remove</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Model segmented control -->
     <div class="field" style="margin:8px 0">
       <label>AI model</label>
-      <select id="model-select">
-          <option value="llama-3.1-8b-instant">Llama 3.1 8B — Instant (fast)</option>
-          <option value="llama-3.3-70b-versatile">Llama 3.3 70B — Versatile (quality)</option>
-      </select>
+      <div id="model-choices" class="seg">
+        <button class="opt" data-model="llama-3.1-8b-instant">
+          <span class="title">UnAI 0.1 • 1B</span>
+          <span class="sub">Instant (fast)</span>
+        </button>
+        <button class="opt" data-model="llama-3.3-70b-versatile">
+          <span class="title">UnAI 0.1 • 10B</span>
+          <span class="sub">Versatile (quality)</span>
+        </button>
+      </div>
     </div>
     <div style="display:flex; justify-content:flex-end; gap:8px">
       <button class="btn secondary" id="settings-close">Close</button>
@@ -533,11 +613,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   state.model ??= 'llama-3.1-8b-instant';
 
+  // Model label + pill
   function modelLabel(id){
     switch(id){
-      case 'llama-3.1-8b-instant':     return 'Llama 3.1 • 8B (Fast)';
-      case 'llama-3.3-70b-versatile':  return 'Llama 3.3 • 70B (Quality)';
-      default:                         return id;
+      case 'llama-3.1-8b-instant': return 'UnAI • 1B (Fast)';
+      case 'llama-3.3-70b-versatile': return 'UnAI • 10B (Quality)';
+      default: return id || 'Model';
     }
   }
   function updateModelPill(){
@@ -591,6 +672,19 @@ window.addEventListener('DOMContentLoaded', () => {
         auth.style.display='';   auth.setAttribute('aria-hidden','false');
       }
     });
+  }
+
+  function setModel(id, {save=true} = {}){
+    if (!id) return;
+    state.model = id;
+    if (save) store.save(state);
+    updateModelPill();
+    // sync UI pieces if they exist
+    document.querySelectorAll('#model-choices .opt').forEach(b=>{
+      b.classList.toggle('active', b.dataset.model === id);
+    });
+    const sel = document.querySelector('#model-select');
+    if (sel) sel.value = id;
   }
 
   /* ============ Conversations ============ */
@@ -719,22 +813,19 @@ window.addEventListener('DOMContentLoaded', () => {
   /* ============ Chat render ============ */
   function msgNode(role, content){
     const isUser = role==='user';
-    const avatar = isUser
-      ? el('div',{class:'avatar'}, el('i',{class:'fa-solid fa-user', 'aria-hidden':'true'}))
-      : el('div',{class:'avatar'}, el('img',{src:'unai.png', alt:'UnAI'}));
-  
-    if(isUser){
-      avatar.style.background='var(--panel)';
-      avatar.style.border='1px solid var(--border)';
-      avatar.style.color='var(--text)';
+    let avatar;
+    if (isUser) {
+      const u = currentUser();
+      if (u?.avatar) {
+        avatar = el('div',{class:'avatar'}, el('img',{src:u.avatar, alt:'You'}));
+      } else {
+      avatar = el('div',{class:'avatar'}, el('i',{class:'fa-solid fa-user','aria-hidden':'true'}));
     }
-  
-    const contentNode = el('div',{class:'content'});
-    contentNode.innerHTML = renderMarkdown(content);
-  
-    return el('div',{class:'msg '+(isUser?'user':'assistant')},
-      avatar, contentNode
-    );
+    } else {
+      avatar = el('div',{class:'avatar'}, el('img',{src:'unai.png', alt:'UnAI'}));
+    }
+    const contentNode = el('div',{class:'content'}); contentNode.innerHTML = renderMarkdown(content);
+    return el('div',{class:'msg '+(isUser?'user':'assistant')}, avatar, contentNode);
   }
 
   function renderChat() {
@@ -851,26 +942,75 @@ window.addEventListener('DOMContentLoaded', () => {
 
   /* ============ Settings (theme + profile) ============ */
   const settingsModal = $('#settings-modal');
+  
+  /* OPEN */
   $('#open-settings')?.addEventListener('click', () => {
     const u = currentUser();
-    const name = $('#profile-name'), mail = $('#profile-email');
+  
+    // basic fields
+    $('#profile-name')  && ($('#profile-name').value  = u?.name  || '');
+    $('#profile-email') && ($('#profile-email').value = u?.email || '');
+  
+    // avatar preview + reset file input, clear pending
+    setAvatarPreview(u?.avatar || '');
+    const file = document.querySelector('#profile-avatar');
+    if (file) file.value = '';
+    _pendingAvatar = null;
+  
+    // MODEL UI — preselect & set pending to current state
+    const currentModel = state.model || 'llama-3.1-8b-instant';
+    _pendingModel = currentModel;
+  
+    // segmented buttons
+    document.querySelectorAll('#model-choices .opt').forEach(b => {
+      b.classList.toggle('active', b.dataset.model === currentModel);
+    });
+  
+    // optional <select> fallback (if you kept it)
     const modelSel = document.querySelector('#model-select');
-    if (modelSel) modelSel.value = state.model || 'llama-3.1-8b-instant';
-    if (name) name.value = u?.name || '';
-    if (mail) mail.value = u?.email || '';
+    if (modelSel) modelSel.value = currentModel;
+  
     settingsModal?.classList.add('open');
   });
-  $('#settings-close')?.addEventListener('click', () => settingsModal?.classList.remove('open'));
+  
+  /* CLOSE */
+  $('#settings-close')?.addEventListener('click', () => {
+    settingsModal?.classList.remove('open');
+    _pendingAvatar = null;
+    _pendingModel  = null;
+  });
+  
+  /* SAVE */
   $('#settings-save')?.addEventListener('click', () => {
     const u = currentUser(); if (!u) return;
+  
+    // name
     u.name = ($('#profile-name')?.value || u.name).trim();
-    state.users[u.email] = u; store.save(state);
-    setYouPillName(u.name);
+  
+    // avatar (only commit if changed)
+    if (_pendingAvatar !== null) {
+      if (_pendingAvatar === '') delete u.avatar;
+      else u.avatar = _pendingAvatar;
+    }
+  
+    // model (prefer segmented selection, fallback to <select>, then state)
     const modelSel = document.querySelector('#model-select');
-    if (modelSel) state.model = modelSel.value || 'llama-3.1-8b-instant';
+    const chosenModel = _pendingModel || (modelSel && modelSel.value) || state.model || 'llama-3.1-8b-instant';
+    state.model = chosenModel;
+  
+    // persist user + state
+    state.users[u.email] = u;
     store.save(state);
-    updateModelPill();
+  
+    // update UI (supports either helper you have)
+    if (typeof setYouPill === 'function') setYouPill(u.name);
+    else if (typeof setYouPillName === 'function') setYouPillName(u.name);
+    if (typeof updateModelPill === 'function') updateModelPill();
+  
+    // close + reset pendings
     settingsModal?.classList.remove('open');
+    _pendingAvatar = null;
+    _pendingModel  = null;
   });
   settingsModal?.querySelectorAll('[data-theme]')?.forEach(b => {
     b.addEventListener('click', () => {
@@ -886,6 +1026,28 @@ window.addEventListener('DOMContentLoaded', () => {
     const you = document.querySelector('#you-pill');
     if (you) you.innerHTML = `<i class="fa-solid fa-user" aria-hidden="true"></i> ${name || 'You'}`;
   }
+
+  let _pendingAvatar = null;  // null = unchanged; string = new dataURL; '' = remove
+  $('#avatar-upload')?.addEventListener('click', ()=> $('#profile-avatar')?.click());
+  $('#profile-avatar')?.addEventListener('change', async (e)=>{
+  const f = e.target.files?.[0]; if(!f) return;
+  const dataURL = await fileToDataURLResized(f, 192);
+  _pendingAvatar = dataURL;
+  setAvatarPreview(dataURL);
+  });
+  $('#avatar-remove')?.addEventListener('click', ()=>{
+  _pendingAvatar = '';
+  setAvatarPreview('');
+  });
+
+  let _pendingModel = null;
+  document.querySelectorAll('#model-choices .opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('#model-choices .opt').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      _pendingModel = btn.dataset.model;
+    });
+  });
   
   const userWrap = document.querySelector('.user-wrap');
   const userMenu = document.querySelector('#user-menu');
@@ -902,6 +1064,34 @@ window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', (e)=>{
     if (!userWrap?.contains(e.target)) closeUserMenu();
   });
+
+  document.querySelectorAll('#model-choices .opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _pendingModel = btn.dataset.model;
+      document.querySelectorAll('#model-choices .opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // instant preview of the pill text (optional)
+      if (typeof updateModelPill === 'function') {
+        const old = state.model; state.model = _pendingModel; updateModelPill(); state.model = old;
+      }
+    });
+  });
+
+  const del = el('button',{
+    class:'iconbtn trash has-tip',
+    'data-tip':'Shift-click: delete instantly',
+    title:'Delete chat',
+    onclick: async (e) => {
+      e.stopPropagation();
+      if (e.shiftKey) { deleteConv(id); return; } // bypass modal
+      const ok = await confirmDialog({
+        title: 'Delete this chat?',
+        message: 'This will permanently remove the conversation.',
+        confirmText: 'Delete'
+      });
+      if (ok) deleteConv(id);
+    }
+  }, el('i',{class:'fa-solid fa-trash','aria-hidden':'true'}));
 
   function renameDialog(currentTitle=''){
     return new Promise(resolve=>{
@@ -947,6 +1137,19 @@ window.addEventListener('DOMContentLoaded', () => {
     return email ? state.users[email] : null;
   }
 
+  function setAvatarPreview(dataURL){
+    const box = document.querySelector('#profile-avatar-preview');
+    const img = document.querySelector('#profile-avatar-img');
+    if (!box || !img) return;
+    if (dataURL && dataURL.trim()){
+      img.src = dataURL;
+      box.classList.add('has-img');
+    } else {
+      img.removeAttribute('src');
+      box.classList.remove('has-img'); // shows the <i class="fa-user">
+    }
+  }
+
   async function llmReplyCloud(messages) {
     const res = await fetch('https://unai-alpha.bbrraaggee.workers.dev/api/chat', {
       method: 'POST',
@@ -960,6 +1163,41 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!res.ok) throw new Error('API error: ' + await res.text());
     const data = await res.json();
     return data.choices?.[0]?.message?.content ?? '(no content)';
+  }
+
+  // Resize an image file to a square dataURL (default 192px) to keep localStorage small
+  function fileToDataURLResized(file, size=192){
+    return new Promise((resolve, reject)=>{
+      const img = new Image();
+      img.onload = ()=> {
+        const canvas = document.createElement('canvas');
+        const s = size;
+        canvas.width = canvas.height = s;
+        const ctx = canvas.getContext('2d');
+        // cover-fit crop
+        const r = Math.max(s/img.width, s/img.height);
+        const w = img.width * r, h = img.height * r;
+        const x = (s - w)/2, y = (s - h)/2;
+        ctx.drawImage(img, x, y, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      const reader = new FileReader();
+      reader.onload = e => img.src = e.target.result;
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  // Update "You" pill with avatar (if any)
+  function setYouPill(name){
+    const you = document.querySelector('#you-pill'); if(!you) return;
+    const u = currentUser();
+    if (u?.avatar) {
+      you.innerHTML = `<img class="you-ava" src="${u.avatar}" alt=""> ${name || 'You'}`;
+    } else {
+      you.innerHTML = `<i class="fa-solid fa-user" aria-hidden="true"></i> ${name || 'You'}`;
+    }
   }
 
   /* ============ Boot ============ */
@@ -983,6 +1221,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (state.order.length === 0) newConv('Welcome to UnAI');
     else currentId = state.order[0];
     renderConvs(); renderChat();
+    setYouPill(u.name);
   }
 
   boot();
